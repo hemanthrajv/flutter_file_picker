@@ -16,15 +16,15 @@ Future<List<PlatformFile>> filePathsToPlatformFiles(
       final file = File(filePath);
 
       if (withReadStream) {
-        return createPlatformFile(file, null, file.openRead());
+        return createPlatformFile(file, null, file.openRead(), file.openRead);
       }
 
       if (!withData) {
-        return createPlatformFile(file, null, null);
+        return createPlatformFile(file, null, null, null);
       }
 
       final bytes = await file.readAsBytes();
-      return createPlatformFile(file, bytes, null);
+      return createPlatformFile(file, bytes, null, null);
     }).toList(),
   );
 }
@@ -33,12 +33,14 @@ Future<PlatformFile> createPlatformFile(
   File file,
   Uint8List? bytes,
   Stream<List<int>>? readStream,
+  ChunkStreamReader? readStreamChunk,
 ) async =>
     PlatformFile(
       bytes: bytes,
       name: basename(file.path),
       path: file.path,
       readStream: readStream,
+      readStreamChunk: readStreamChunk,
       size: file.existsSync() ? file.lengthSync() : 0,
     );
 

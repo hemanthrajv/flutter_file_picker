@@ -111,12 +111,12 @@ class FilePickerIO extends FilePicker {
       final List<PlatformFile> platformFiles = <PlatformFile>[];
 
       for (final Map platformFileMap in result) {
+        var file = File(platformFileMap['path']);
         platformFiles.add(
           PlatformFile.fromMap(
             platformFileMap,
-            readStream: withReadStream!
-                ? File(platformFileMap['path']).openRead()
-                : null,
+            readStream: withReadStream! ? file.openRead() : null,
+            readStreamChunk: withReadStream! ? file.openRead : null,
           ),
         );
       }

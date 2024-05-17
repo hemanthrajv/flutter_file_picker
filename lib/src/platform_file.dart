@@ -5,6 +5,8 @@ import 'dart:typed_data';
 import 'package:cross_file/cross_file.dart';
 import 'package:flutter/foundation.dart';
 
+typedef ChunkStreamReader = Stream<List<int>>? Function([int? start, int? end]);
+
 class PlatformFile {
   PlatformFile({
     String? path,
@@ -12,10 +14,17 @@ class PlatformFile {
     required this.size,
     this.bytes,
     this.readStream,
+    this.readStreamChunk,
     this.identifier,
   }) : _path = path;
 
-  factory PlatformFile.fromMap(Map data, {Stream<List<int>>? readStream}) {
+  factory PlatformFile.fromMap(
+    Map data, {
+    Stream<List<int>>? readStream,
+    ChunkStreamReader? readStreamChunk,
+  }) {
+    assert((readStream == null && readStreamChunk == null) ||
+        (readStream != null && readStreamChunk != null));
     return PlatformFile(
       name: data['name'],
       path: data['path'],
@@ -23,6 +32,7 @@ class PlatformFile {
       size: data['size'],
       identifier: data['identifier'],
       readStream: readStream,
+      readStreamChunk: readStreamChunk,
     );
   }
 
@@ -57,6 +67,8 @@ class PlatformFile {
 
   /// File content as stream
   final Stream<List<int>>? readStream;
+
+  final ChunkStreamReader? readStreamChunk;
 
   /// The file size in bytes. Defaults to `0` if the file size could not be
   /// determined.

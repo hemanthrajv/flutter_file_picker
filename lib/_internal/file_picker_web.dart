@@ -1,10 +1,10 @@
 import 'dart:async';
 import 'dart:js_interop';
-import 'package:web/web.dart';
 import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter_web_plugins/flutter_web_plugins.dart';
+import 'package:web/web.dart';
 
 class FilePickerWeb extends FilePicker {
   late Element _target;
@@ -87,6 +87,7 @@ class FilePickerWeb extends FilePicker {
         Uint8List? bytes,
         String? path,
         Stream<List<int>>? readStream,
+        ChunkStreamReader? readStreamChunk,
       ) {
         pickedFiles.add(PlatformFile(
           name: file.name,
@@ -94,6 +95,7 @@ class FilePickerWeb extends FilePicker {
           size: bytes != null ? bytes.length : file.size,
           bytes: bytes,
           readStream: readStream,
+          readStreamChunk: readStreamChunk,
         ));
 
         if (pickedFiles.length >= files.length) {
@@ -111,7 +113,13 @@ class FilePickerWeb extends FilePicker {
         }
 
         if (withReadStream) {
-          addPickedFile(file, null, null, _openFileReadStream(file));
+          addPickedFile(
+            file,
+            null,
+            null,
+            _openFileReadStream(file),
+            ([int? start, int? end]) => _openFileReadStream(file, start, end),
+          );
           continue;
         }
 
@@ -119,7 +127,7 @@ class FilePickerWeb extends FilePicker {
           final FileReader reader = FileReader();
           reader.onLoadEnd.listen((e) {
             String? result = (reader.result as JSString?)?.toDart;
-            addPickedFile(file, null, result, null);
+            addPickedFile(file, null, result, null, null);
           });
           reader.readAsDataURL(file);
           continue;
@@ -129,7 +137,7 @@ class FilePickerWeb extends FilePicker {
         final FileReader reader = FileReader();
         reader.onLoadEnd.listen((e) {
           ByteBuffer? byteBuffer = (reader.result as JSArrayBuffer?)?.toDart;
-          addPickedFile(file, byteBuffer?.asUint8List(), null, null);
+          addPickedFile(file, byteBuffer?.asUint8List(), null, null, null);
           syncCompleter.complete();
         });
         reader.readAsArrayBuffer(file);
@@ -197,15 +205,18 @@ class FilePickerWeb extends FilePicker {
     }
   }
 
-  Stream<List<int>> _openFileReadStream(File file) async* {
+  Stream<List<int>> _openFileReadStream(File file,
+      [int? start, int? end]) async* {
     final reader = FileReader();
 
-    int start = 0;
-    while (start < file.size) {
-      final end = start + _readStreamChunkSize > file.size
-          ? file.size
-          : start + _readStreamChunkSize;
-      final blob = file.slice(start, end);
+    int globalOffset = start ?? 0;
+    int globalEnd = end ?? file.size;
+
+    while (globalOffset < globalEnd) {
+      final chunkEnd = globalOffset + _readStreamChunkSize > globalEnd
+          ? globalEnd
+          : globalOffset + _readStreamChunkSize;
+      final blob = file.slice(globalOffset, chunkEnd);
       reader.readAsArrayBuffer(blob);
       await EventStreamProviders.loadEvent.forTarget(reader).first;
       final JSAny? readerResult = reader.result;
@@ -216,7 +227,7 @@ class FilePickerWeb extends FilePicker {
       // Handle the ArrayBuffer type. This maps to a `ByteBuffer` in Dart.
       if (readerResult.instanceOfString('ArrayBuffer')) {
         yield (readerResult as JSArrayBuffer).toDart.asUint8List();
-        start += _readStreamChunkSize;
+        globalOffset += _readStreamChunkSize;
         continue;
       }
       // TODO: use `isA<JSArray>()` when switching to Dart 3.4
@@ -224,7 +235,7 @@ class FilePickerWeb extends FilePicker {
       if (readerResult.instanceOfString('Array')) {
         // Assume this is a List<int>.
         yield (readerResult as JSArray).toDart.cast<int>();
-        start += _readStreamChunkSize;
+        globalOffset += _readStreamChunkSize;
       }
     }
   }
