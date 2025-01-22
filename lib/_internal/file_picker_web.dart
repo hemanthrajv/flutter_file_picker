@@ -19,7 +19,7 @@ class FilePickerWeb extends FilePicker {
   }
 
   static void registerWith(Registrar registrar) {
-    FilePicker.platform = platform;
+    FilePicker.platform = FilePickerWeb._();
   }
 
   /// Initializes a DOM container where we can host input elements.
@@ -176,6 +176,12 @@ class FilePickerWeb extends FilePicker {
     }
     _target.children.add(uploadInput);
     uploadInput.click();
+
+    firstChild = _target.firstChild;
+    while (firstChild != null) {
+      _target.removeChild(firstChild);
+      firstChild = _target.firstChild;
+    }
 
     final List<PlatformFile>? files = await filesCompleter.future;
 
