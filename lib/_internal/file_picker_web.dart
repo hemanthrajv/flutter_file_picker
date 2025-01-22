@@ -211,8 +211,11 @@ class FilePickerWeb extends FilePicker {
     }
   }
 
-  Stream<List<int>> _openFileReadStream(File file,
-      [int? start, int? end]) async* {
+  Stream<List<int>> _openFileReadStream(
+    File file, [
+    int? start,
+    int? end,
+  ]) async* {
     int _readStreamChunkSize = this._readStreamChunkSize;
 
     // file greater than 200 mb
@@ -228,28 +231,36 @@ class FilePickerWeb extends FilePicker {
           ? globalEnd
           : globalOffset + _readStreamChunkSize;
       final blob = file.slice(globalOffset, chunkEnd);
-      final reader =
-          FileReader(); // Reinitialize inside the loop to free memory
+
+      // Reinitialize inside the loop to free memory
+      FileReader? reader = FileReader();
 
       final completer = Completer<void>();
 
-      reader.onLoadEnd.listen((event) {
-        completer.complete(); // Resolve the future when load completes
+      final StreamSubscription<ProgressEvent> readerSub =
+          reader.onLoadEnd.listen((event) {
+        // Resolve the future when load completes
+        completer.complete();
       });
 
       reader.readAsArrayBuffer(blob);
-      await completer.future; // Wait until the file is read
 
-      final JSAny? readerResult = reader.result;
+      // Wait until the file is read
+      await completer.future;
+      await readerSub.cancel();
+
+      JSAny? readerResult = reader.result;
 
       if (readerResult == null) continue;
 
-      if (readerResult.instanceOfString('ArrayBuffer')) {
+      if (readerResult.isA<JSArrayBuffer>()) {
         yield (readerResult as JSArrayBuffer).toDart.asUint8List();
-      } else if (readerResult.instanceOfString('Array')) {
+      } else if (readerResult.isA<JSArray>()) {
         yield (readerResult as JSArray).toDart.cast<int>();
       }
 
+      readerResult = null;
+      reader = null;
       globalOffset += _readStreamChunkSize;
     }
   }
